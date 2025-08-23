@@ -1,13 +1,27 @@
 export function getProduct(productId) {
-  let matchingProduct;
-
-  products.forEach((product) => {
-    if (product.id === productId) {
-      matchingProduct = product;
+  try {
+    if (!productId) {
+      console.error('Product ID is required');
+      return null;
     }
-  });
 
-  return matchingProduct;
+    let matchingProduct;
+
+    products.forEach((product) => {
+      if (product.id === productId) {
+        matchingProduct = product;
+      }
+    });
+
+    if (!matchingProduct) {
+      console.warn(`Product with ID ${productId} not found`);
+    }
+
+    return matchingProduct;
+  } catch (error) {
+    console.error('Error getting product:', error);
+    return null;
+  }
 }
 
 export const products = [

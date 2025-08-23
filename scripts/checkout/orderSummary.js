@@ -7,67 +7,113 @@ import {deliveryOptions, getDeliveryOption} from '../../data/deliveryOptions.js'
 import {renderPaymentSummary} from './paymentSummary.js';
 
 export function renderOrderSummary() {
-  let cartSummaryHTML = '';
+  try {
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      document.querySelector('.order-summary').innerHTML = 
+        '<div class="empty-cart-message">Your cart is empty. <a href="amazon.html">Continue shopping</a></div>';
+      return;
+    }
 
-  cart.forEach((cartItem) => {
-    const productId = cartItem.productId;
+    let cartSummaryHTML = '';
 
-    const matchingProduct = getProduct(productId);
+    cart.forEach((cartItem) => {
+      try {
+        if (!cartItem || !cartItem.productId) {
+          console.warn('Invalid cart item:', cartItem);
+          return;
+        }
 
-    const deliveryOptionId = cartItem.deliveryOptionId;
+        const productId = cartItem.productId;
+        const matchingProduct = getProduct(productId);
 
-    const deliveryOption = getDeliveryOption(deliveryOptionId);
+        if (!matchingProduct) {
+          console.warn(`Product not found for ID: ${productId}`);
+          return;
+        }
 
-    const today = dayjs();
-    const deliveryDate = today.add(
-      deliveryOption.deliveryDays,
-      'days'
-    );
-    const dateString = deliveryDate.format(
-      'dddd, MMMM D'
-    );
+        const deliveryOptionId = cartItem.deliveryOptionId || '1';
+        const deliveryOption = getDeliveryOption(deliveryOptionId);
 
-    cartSummaryHTML += `
-      <div class="cart-item-container
-        js-cart-item-container-${matchingProduct.id}">
-        <div class="delivery-date">
-          Delivery date: ${dateString}
-        </div>
+        if (!deliveryOption) {
+          console.warn(`Delivery option not found for ID: ${deliveryOptionId}`);
+          return;
+        }
 
-        <div class="cart-item-details-grid">
-          <img class="product-image"
-            src="${matchingProduct.image}">
+        const today = dayjs();
+        const deliveryDate = today.add(
+          deliveryOption.deliveryDays,
+          'days'
+        );
+        const dateString = deliveryDate.format(
+          'dddd, MMMM D'
+        );
 
-          <div class="cart-item-details">
-            <div class="product-name">
-              ${matchingProduct.name}
+        cartSummaryHTML += `
+          <div class="cart-item-container
+            js-cart-item-container-${matchingProduct.id}">
+            <div class="delivery-date">
+              Delivery date: ${dateString}
             </div>
-            <div class="product-price">
-              $${formatCurrency(matchingProduct.priceCents)}
-            </div>
-            <div class="product-quantity">
-              <span>
-                Quantity: <span class="quantity-label">${cartItem.quantity}</span>
-              </span>
-              <span class="update-quantity-link link-primary">
-                Update
-              </span>
-              <span class="delete-quantity-link link-primary js-delete-link" data-product-id="${matchingProduct.id}">
-                Delete
-              </span>
+
+            <div class="cart-item-details-grid">
+              <img class="product-image"
+                src="${matchingProduct.image || 'images/products/placeholder.jpg'}"
+                alt="${matchingProduct.name}"
+                onerror="this.src='images/products/placeholder.jpg'">
+
+              <div class="cart-item-details">
+                <div class="product-name">
+                  ${matchingProduct.name}
+                </div>
+                <div class="product-price">
+                  $${formatCurrency(matchingProduct.priceCents)}
+                </div>
+                <div class="product-quantity">
+                  <span>
+                    Quantity: <span class="quantity-label">${cartItem.quantity || 1}</span>
+                  </span>
+                  <span class="update-quantity-link link-primary">
+                    Update
+                  </span>
+                  <span class="delete-quantity-link link-primary js-delete-link" data-product-id="${matchingProduct.id}">
+                    Delete
+                  </span>
+                </div>
+              </div>
+
+              <div class="delivery-options">
+                <div class="delivery-options-title">
+                  Choose a delivery option:
+                </div>
+                ${deliveryOptionsHTML(matchingProduct, cartItem)}
+              </div>
             </div>
           </div>
+        `;
+      } catch (error) {
+        console.error('Error rendering cart item:', cartItem, error);
+      }
+    });
 
-          <div class="delivery-options">
-            <div class="delivery-options-title">
-              Choose a delivery option:
-            </div>
-            ${deliveryOptionsHTML(matchingProduct, cartItem)}
-          </div>
-        </div>
-      </div>
-    `;
-  });
+    try {
+      const orderSummaryElement = document.querySelector('.order-summary');
+      if (orderSummaryElement) {
+        orderSummaryElement.innerHTML = cartSummaryHTML;
+        setupEventListeners();
+      } else {
+        console.error('Order summary element not found');
+      }
+    } catch (error) {
+      console.error('Error updating order summary:', error);
+    }
+  } catch (error) {
+    console.error('Error rendering order summary:', error);
+    const orderSummaryElement = document.querySelector('.order-summary');
+    if (orderSummaryElement) {
+      orderSummaryElement.innerHTML = '<div class="error-message">Error loading order summary. Please refresh the page.</div>';
+    }
+  }
+}
 
   function deliveryOptionsHTML(matchingProduct, cartItem) {
     let html = '';
@@ -111,31 +157,29 @@ export function renderOrderSummary() {
     return html;
   }
 
-  document.querySelector('.js-order-summary')
-    .innerHTML = cartSummaryHTML;
+  function setupEventListeners() {
+    document.querySelectorAll('.js-delete-link')
+      .forEach((link) => {
+        link.addEventListener('click', () => {
+          const productId = link.dataset.productId;
+          removeFromCart(productId);
 
-  document.querySelectorAll('.js-delete-link')
-    .forEach((link) => {
-      link.addEventListener('click', () => {
-        const productId = link.dataset.productId;
-        removeFromCart(productId);
+          const container = document.querySelector(
+            `.js-cart-item-container-${productId}`
+          );
+          container.remove();
 
-        const container = document.querySelector(
-          `.js-cart-item-container-${productId}`
-        );
-        container.remove();
-
-        renderPaymentSummary();
+          renderPaymentSummary();
+        });
       });
-    });
 
-  document.querySelectorAll('.js-delivery-option')
-    .forEach((element) => {
-      element.addEventListener('click', () => {
-        const {productId, deliveryOptionId} = element.dataset;
-        updateDeliveryOption(productId, deliveryOptionId);
-        renderOrderSummary();
-        renderPaymentSummary();
+    document.querySelectorAll('.js-delivery-option')
+      .forEach((element) => {
+        element.addEventListener('click', () => {
+          const {productId, deliveryOptionId} = element.dataset;
+          updateDeliveryOption(productId, deliveryOptionId);
+          renderOrderSummary();
+          renderPaymentSummary();
+        });
       });
-    });
-}
+  }

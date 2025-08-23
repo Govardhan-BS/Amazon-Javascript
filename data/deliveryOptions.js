@@ -13,13 +13,28 @@ export const deliveryOptions = [{
 }];
 
 export function getDeliveryOption(deliveryOptionId) {
-  let deliveryOption;
-
-  deliveryOptions.forEach((option) => {
-    if (option.id === deliveryOptionId) {
-      deliveryOption = option;
+  try {
+    if (!deliveryOptionId) {
+      console.warn('Delivery option ID is required');
+      return deliveryOptions[0];
     }
-  });
 
-  return deliveryOption || deliveryOptions[0];
+    let deliveryOption;
+
+    deliveryOptions.forEach((option) => {
+      if (option.id === deliveryOptionId) {
+        deliveryOption = option;
+      }
+    });
+
+    if (!deliveryOption) {
+      console.warn(`Delivery option with ID ${deliveryOptionId} not found, using default`);
+      return deliveryOptions[0];
+    }
+
+    return deliveryOption;
+  } catch (error) {
+    console.error('Error getting delivery option:', error);
+    return deliveryOptions[0];
+  }
 }
